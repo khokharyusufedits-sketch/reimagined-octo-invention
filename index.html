@@ -131,7 +131,7 @@
                 let averageVolume = totalVolume / bufferLength;
 
                 // Adjust '60' if your mic is too sensitive or not sensitive enough
-                if (averageVolume > 60) { 
+                if (averageVolume > 20)
                     isScreaming = true;
                     cooldownTimer = 40; // Keeps heart active for ~2 seconds after scream ends
                 }

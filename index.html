@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Scream Reactive Heart Rate</title>
+    <title>Voice Word Reactive Heart Rate</title>
     <style>
         body {
             margin: 0; overflow: hidden; background: transparent;
@@ -50,31 +50,29 @@
         const bpmText = document.getElementById('bpmElement');
         let currentBPM = 74; let cooldownTimer = 0;
 
-        navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            const audioContext = new AudioContext();
-            const analyser = audioContext.createAnalyser();
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-            analyser.fftSize = 256;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        // Use built-in browser Speech Recognition
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
 
-            function checkAudio() {
-                analyser.getByteFrequencyData(dataArray);
-                let maxVolume = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    if (dataArray[i] > maxVolume) maxVolume = dataArray[i];
-                }
-                
-                // This makes it look for ANY loud sound at all
-                if (maxVolume > 120) { 
-                    cooldownTimer = 20; 
-                }
-                requestAnimationFrame(checkAudio);
-            }
-            checkAudio();
-        }).catch(err => console.error(err));
+            recognition.onresult = (event) => {
+                // The moment you say a word out loud, it instantly triggers the heart spike
+                cooldownTimer = 25; 
+            };
 
+            recognition.onend = () => {
+                recognition.start(); // Keep listening forever
+            };
+
+            recognition.start();
+        } else {
+            console.error("Speech recognition not supported in this browser environment.");
+        }
+
+        // Visual animation update loop
         setInterval(() => {
             if (cooldownTimer > 0) {
                 cooldownTimer--;

@@ -2,150 +2,96 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Action Reactive Heart Rate Overlay</title>
+    <title>Scream Reactive Heart Rate</title>
     <style>
         body {
-            margin: 0;
-            overflow: hidden;
-            background: transparent;
+            margin: 0; overflow: hidden; background: transparent;
             font-family: 'Arial Black', Impact, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+            display: flex; align-items: center; justify-content: center; height: 100vh;
         }
-
-        .widget-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 10px;
-        }
-
-        /* The Heart Shape */
+        .widget-container { display: flex; align-items: center; gap: 15px; padding: 10px; }
         .heart {
-            position: relative;
-            width: 50px;
-            height: 50px;
-            background-color: #ff2a2a;
-            transform: rotate(-45deg);
-            box-shadow: 0 0 20px rgba(255, 42, 42, 0.6);
+            position: relative; width: 50px; height: 50px; background-color: #ff2a2a;
+            transform: rotate(-45deg); box-shadow: 0 0 20px rgba(255, 42, 42, 0.6);
         }
         .heart::before, .heart::after {
-            content: "";
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            background-color: #ff2a2a;
-            border-radius: 50%;
+            content: ""; position: absolute; width: 50px; height: 50px;
+            background-color: #ff2a2a; border-radius: 50%;
         }
         .heart::before { top: -25px; left: 0; }
         .heart::after { left: 25px; top: 0; }
-
-        /* Smooth idle pulse animation */
         @keyframes pulse {
             0% { transform: scale(1) rotate(-45deg); }
             30% { transform: scale(1.15) rotate(-45deg); }
             60% { transform: scale(1) rotate(-45deg); }
         }
-        .pulse-idle {
-            animation: pulse 0.8s infinite ease-in-out;
-        }
-
-        /* VIOLENT SHAKE ANIMATION FOR ACTION STREAKS */
+        .pulse-idle { animation: pulse 0.8s infinite ease-in-out; }
         @keyframes extreme-shake {
             0% { transform: translate(2px, 1px) rotate(-43deg) scale(1.3); }
-            10% { transform: translate(-1px, -2px) rotate(-47deg) scale(1.3); }
             20% { transform: translate(-3px, 0px) rotate(-44deg) scale(1.4); }
-            30% { transform: translate(0px, 2px) rotate(-46deg) scale(1.3); }
             40% { transform: translate(1px, -1px) rotate(-43deg) scale(1.4); }
-            50% { transform: translate(-1px, 2px) rotate(-45deg) scale(1.3); }
             60% { transform: translate(-3px, 1px) rotate(-47deg) scale(1.4); }
-            70% { transform: translate(2px, 1px) rotate(-44deg) scale(1.3); }
             80% { transform: translate(-1px, -1px) rotate(-46deg) scale(1.3); }
-            90% { transform: translate(2px, 2px) rotate(-43deg) scale(1.4); }
             100% { transform: translate(1px, -2px) rotate(-45deg) scale(1.3); }
         }
-        .shake-active {
-            animation: extreme-shake 0.1s infinite;
-            background-color: #ff0055 !important;
-        }
-        .shake-active::before, .shake-active::after {
-            background-color: #ff0055 !important;
-        }
-
-        /* Text Styling */
-        .bpm-text {
-            color: #ffffff;
-            font-size: 42px;
-            text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000;
-            width: 180px;
-        }
-        .high-bpm {
-            color: #ff0055;
-            text-shadow: 0 0 10px rgba(255,0,85,0.8), 2px 2px 0px #000;
-        }
+        .shake-active { animation: extreme-shake 0.1s infinite; background-color: #ff0055 !important; }
+        .shake-active::before, .shake-active::after { background-color: #ff0055 !important; }
+        .bpm-text { color: #ffffff; font-size: 42px; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000; width: 180px; }
+        .high-bpm { color: #ff0055; text-shadow: 0 0 10px rgba(255,0,85,0.8), 2px 2px 0px #000; }
     </style>
 </head>
 <body>
-
     <div class="widget-container">
         <div id="heartElement" class="heart pulse-idle"></div>
         <div id="bpmElement" class="bpm-text">74 BPM</div>
     </div>
-
     <script>
         const heart = document.getElementById('heartElement');
         const bpmText = document.getElementById('bpmElement');
+        let currentBPM = 74; let cooldownTimer = 0;
 
-        let currentBPM = 74;
-        let isSpiked = false;
-        let cooldownTimer = 0;
+        navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        // Base values
-        const IDLE_MIN = 72;
-        const IDLE_MAX = 88;
-        const SCREAM_MIN = 158;
-        const SCREAM_MAX = 184;
+            function checkAudio() {
+                analyser.getByteFrequencyData(dataArray);
+                let maxVolume = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    if (dataArray[i] > maxVolume) maxVolume = dataArray[i];
+                }
+                
+                // This makes it look for ANY loud sound at all
+                if (maxVolume > 40) { 
+                    cooldownTimer = 20; 
+                }
+                requestAnimationFrame(checkAudio);
+            }
+            checkAudio();
+        }).catch(err => console.error(err));
 
-        // Keys that trigger the spike (Space = Jump, Shift = Powerslide, L-Click = Boost etc.)
-        // You can add any keys you press a lot during Rocket League matches here!
-        const actionKeys = ['Space', 'ShiftLeft', 'ShiftRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'];
-
-        // Listen for key presses anywhere on the system/game interface
-        window.addEventListener('keydown', (e) => {
-            isSpiked = true;
-            cooldownTimer = 25; // Keeps it high for roughly 2.5 seconds after tapping keys
-        });
-
-        // Frame update loop for changing the visual numbers/animations
         setInterval(() => {
             if (cooldownTimer > 0) {
                 cooldownTimer--;
-            } else {
-                isSpiked = false;
-            }
-
-            if (isSpiked) {
-                // Instantly scale up the numbers & slap on the shaking CSS class
-                currentBPM = Math.floor(Math.random() * (SCREAM_MAX - SCREAM_MIN + 1)) + SCREAM_MIN;
+                currentBPM = Math.floor(Math.random() * (184 - 158 + 1)) + 158;
                 bpmText.innerText = currentBPM + " BPM";
                 bpmText.classList.add('high-bpm');
-                heart.classList.remove('pulse-idle');
-                heart.classList.add('shake-active');
+                heart.classList.remove('pulse-idle'); heart.classList.add('shake-active');
             } else {
-                // Drop back down gently to normal levels
-                let targetIdle = Math.floor(Math.random() * (IDLE_MAX - IDLE_MIN + 1)) + IDLE_MIN;
-                currentBPM = Math.floor(currentBPM * 0.85 + targetIdle * 0.15); 
-                
-                bpmText.innerText = currentBPM + " BPM";
+                let targetIdle = Math.floor(Math.random() * (88 - 72 + 1)) + 72;
+                currentBPM = Math.floor(currentBPM * 0.85 + targetIdle * 0.15);
+                bpmText.innerText = Math.floor(currentBPM) + " BPM";
                 if(currentBPM < 100) {
                     bpmText.classList.remove('high-bpm');
-                    heart.classList.remove('shake-active');
-                    heart.classList.add('pulse-idle');
+                    heart.classList.remove('shake-active'); heart.classList.add('pulse-idle');
                 }
             }
-        }, 100); 
+        }, 100);
     </script>
 </body>
 </html>
